@@ -55,18 +55,20 @@ def fetch_users():
 
 def init_products_table():
     with sqlite3.connect("shoppers.db") as conn:
-        conn.execute("CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        conn.execute("CREATE TABLE IF NOT EXISTS product (id INTEGER PRIMARY KEY AUTOINCREMENT,"
                      "name TEXT NOT NULL,"
                      "price INTEGER NOT NULL,"
                      "description TEXT NOT NULL,"
-                     "type TEXT NOT NULL)")
+                     "type TEXT NOT NULL,"
+                     "quantity INTEGER NOT NULL,"
+                     "total INTEGER NOT NULL)")
         print("products table created successfully")
 
 
 def fetch_products():
     with sqlite3.connect("shoppers.db") as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM products")
+        cursor.execute("SELECT * FROM product")
         items = cursor.fetchall()
 
         new_item = []
@@ -167,15 +169,19 @@ def create_products():
         price = request.form['price']
         desc = request.form['description']
         product_type = request.form['type']
+        quantity = request.form['quantity']
+        total = int(price) * int(quantity)
 
         with sqlite3.connect("shoppers.db") as conn:
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO products("
+            cursor.execute("INSERT INTO product("
                            "name,"
                            "price,"
                            "description,"
-                           "type) VALUES (?, ?, ?, ?)",
-                           (name, price, desc, product_type))
+                           "type,"
+                           "quantity,"
+                           "total) VALUES (?, ?, ?, ?, ?, ?)",
+                           (name, price, desc, product_type, quantity, total))
             conn.commit()
             response["status_code"] = 201
             response["description"] = "Product created successfully"
@@ -188,7 +194,7 @@ def show_products():
 
     with sqlite3.connect("shoppers.db") as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM products")
+        cursor.execute("SELECT * FROM product")
 
         response["status_code"] = 200
         response["description"] = "Displaying all products successfully"
@@ -201,12 +207,52 @@ def delete_products(product_id):
     response = {}
     with sqlite3.connect("shoppers.db") as conn:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM products WHERE id=" + str(product_id))
+        cursor.execute("DELETE FROM product WHERE id=" + str(product_id))
         conn.commit()
         response['status_code'] = 200
         response['message'] = "Product successfully deleted"
 
     return response
+
+
+@app.route('/edit-products/<int:product_id>', methods=["PUT"])
+def edit_products(product_id):
+    response = {}
+    if request.method == "PUT":
+        with sqlite3.connect("shoppers.db") as conn:
+            incoming_data = dict(request.json)
+
+            put_data = {}
+            if incoming_data.get("price") is not None:
+                put_data["price"] = incoming_data.get("price")
+                with sqlite3.connect("shoppers.db") as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("UPDATE product SET price=? WHERE id=?", (put_data["price"], product_id))
+                    conn.commit()
+                    response['message'] = "Update was successful"
+                    response['status_code'] = 200
+                return response
+            if incoming_data.get("quantity") is not None:
+                put_data["quantity"] = incoming_data.get("quantity")
+                with sqlite3.connect("shoppers.db") as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("UPDATE product SET quantity=? WHERE id=?", (put_data["quantity"], product_id))
+                    conn.commit()
+                    response['message'] = "Update was successful"
+                    response['status_code'] = 200
+
+                return response
+            new_price = int(incoming_data.get("price"))
+            new_quantity = int(incoming_data.get("quantity"))
+            new_total = new_price * new_quantity
+            if incoming_data.get("total") is not None:
+                put_data["total"] = incoming_data.get("total")
+                with sqlite3.connect("shoppers.db") as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("UPDATE product SET total WHERE id=?", (new_total, product_id))
+                    response['status_code'] = 200
+                    response['message'] = "Update was successful"
+                return response
 
 
 if __name__ == '__main__':
