@@ -4,6 +4,7 @@
 from flask import Flask, request, jsonify
 from flask_jwt import JWT, jwt_required, current_identity
 from flask_cors import CORS
+from flask_mail import Mail, Message
 import hmac
 import sqlite3
 
@@ -24,21 +25,42 @@ class Products(object):
         self.type = product_type
 
 
-def init_users_table():
-    conn = sqlite3.connect('shoppers.db')
-    print("Opened database successfully")
+class Database:
+    def __init__(self):
+        self.conn = sqlite3.connect("shoppers.db")
+        self.cursor = self.conn.cursor()
 
-    conn.execute("CREATE TABLE IF NOT EXISTS user(user_id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                 "first_name TEXT NOT NULL,"
-                 "last_name TEXT NOT NULL,"
-                 "address TEXT NOT NULL,"
-                 "email TEXT NOT NULL,"
-                 "username TEXT NOT NULL,"
-                 "password TEXT NOT NULL)")
-    print("user table created successfully")
-    conn.close()
+    # function that initialises the user table
+    def init_users_table(self):
+        conn = sqlite3.connect('shoppers.db')
+        print("Opened database successfully")
+
+        conn.execute("CREATE TABLE IF NOT EXISTS user(user_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                     "first_name TEXT NOT NULL,"
+                     "last_name TEXT NOT NULL,"
+                     "address TEXT NOT NULL,"
+                     "email TEXT NOT NULL,"
+                     "username TEXT NOT NULL,"
+                     "password TEXT NOT NULL)")
+        print("user table created successfully")
+        conn.close()
+        return self.init_users_table
+
+    # Initialising the products table
+    def init_products_table(self):
+        with sqlite3.connect("shoppers.db") as conn:
+            conn.execute("CREATE TABLE IF NOT EXISTS product (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                         "name TEXT NOT NULL,"
+                         "price INTEGER NOT NULL,"
+                         "description TEXT NOT NULL,"
+                         "type TEXT NOT NULL,"
+                         "quantity INTEGER NOT NULL,"
+                         "total INTEGER NOT NULL)")
+            print("products table created successfully")
+        return self.init_products_table
 
 
+# function that fetches the users and puts it into a list
 def fetch_users():
     with sqlite3.connect('shoppers.db') as conn:
         cursor = conn.cursor()
@@ -51,18 +73,6 @@ def fetch_users():
             print(data)
             new_data.append(User(data[0], data[5], data[6]))
     return new_data
-
-
-def init_products_table():
-    with sqlite3.connect("shoppers.db") as conn:
-        conn.execute("CREATE TABLE IF NOT EXISTS product (id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                     "name TEXT NOT NULL,"
-                     "price INTEGER NOT NULL,"
-                     "description TEXT NOT NULL,"
-                     "type TEXT NOT NULL,"
-                     "quantity INTEGER NOT NULL,"
-                     "total INTEGER NOT NULL)")
-        print("products table created successfully")
 
 
 def fetch_products():
@@ -79,8 +89,8 @@ def fetch_products():
         return new_item
 
 
-init_users_table()
-init_products_table()
+# calling the functions
+Database()
 users = fetch_users()
 products = fetch_products()
 
@@ -91,6 +101,7 @@ product_table = {p.name: p for p in products}
 productid_table = {p.id: p for p in products}
 
 
+# to help protect our password
 def authenticate(username, password):
     user = username_table.get(username, None)
     if user and hmac.compare_digest(user.password.encode('utf-8'), password.encode('utf-8')):
@@ -102,20 +113,31 @@ def identity(payload):
     return userid_table.get(user_id, None)
 
 
+# to start the flask app
 app = Flask(__name__)
 CORS(app)
 app.debug = True
 app.config['SECRET_KEY'] = 'super-secret'
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USERNAME'] = 'lifechoiceslotto147@gmail.com'
+app.config['MAIL_PASSWORD'] = 'lifechoices2021'
+app.config['MAIL_USE_TLS'] = False
+app.config['MAIL_USE_SSL'] = True
+mail = Mail(app)
 
+# using this to help get the token
 jwt = JWT(app, authenticate, identity)
 
 
+# using this check if the token is working
 @app.route('/protected')
 @jwt_required()
 def protected():
     return '%s' % current_identity
 
 
+# a route that register a new user
 @app.route('/user-registration/', methods=["POST"])
 def user_registration():
     response = {}
@@ -140,11 +162,16 @@ def user_registration():
                            "password) VALUES(?, ?, ?, ?, ?, ?)",
                            (first_name, last_name, address, email, username, password))
             conn.commit()
+
             response["message"] = "success"
             response["status_code"] = 201
+            msg = Message("Welcome new user!!!", sender="lifechoiceslotto147@gmail.com", recipients=[email])
+            msg.body = "You have successfully registered an account"
+            mail.send(msg)
         return response
 
 
+# a route to view a single users profile
 @app.route('/view-profile/<int:user_id>')
 def view_profile(user_id):
     response = {}
@@ -160,7 +187,9 @@ def view_profile(user_id):
     return jsonify(response)
 
 
+# a route to add new products
 @app.route('/create-products', methods=["POST"])
+@jwt_required()
 def create_products():
     response = {}
 
@@ -188,6 +217,7 @@ def create_products():
         return response
 
 
+# a route to show all the products
 @app.route('/show-products')
 def show_products():
     response = {}
@@ -202,6 +232,7 @@ def show_products():
     return jsonify(response)
 
 
+# a route to delete a specific product
 @app.route('/delete-products/<int:product_id>')
 def delete_products(product_id):
     response = {}
@@ -215,6 +246,7 @@ def delete_products(product_id):
     return response
 
 
+# a route that allows the user to edit certain details about the product
 @app.route('/edit-products/<int:product_id>', methods=["PUT"])
 def edit_products(product_id):
     response = {}
@@ -255,6 +287,28 @@ def edit_products(product_id):
                 return response
 
 
+@app.route('/send-email/<int:user_id>', methods=['GET', 'POST'])
+def send_email(user_id):
+    response = {}
+    products = 'My name is Thabo. I like to steal'
+
+    if request.method == "POST":
+        with sqlite3.connect("shoppers.db") as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM user WHERE user_id=?", str(user_id))
+            receiver = cursor.fetchall()
+            print(receiver)
+            for data in receiver:
+                print(data)
+                msg = Message("Product received", sender="lifechoiceslotto147@gmail.com", recipients=[data[4]])
+                msg.body = products
+                mail.send(msg)
+        response['status_code'] = 200
+        response['message'] = "Email was sent successful"
+    return response
+
+
+# This statement helps run the flask app instead of using the terminal
 if __name__ == '__main__':
     app.run()
 
