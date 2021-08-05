@@ -308,6 +308,11 @@ def send_email(user_id):
     return response
 
 
+@app.errorhandler(ConnectionError)
+def connection(e):
+    return "Error message", str(e)
+
+
 # This statement helps run the flask app instead of using the terminal
 if __name__ == '__main__':
     app.run()
