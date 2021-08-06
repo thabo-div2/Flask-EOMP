@@ -116,9 +116,11 @@ def identity(payload):
 
 # to start the flask app
 app = Flask(__name__)
+# to make sure that the front end can fetch the api
 CORS(app)
 app.debug = True
 app.config['SECRET_KEY'] = 'super-secret'
+# this is for the flask mail
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 465
 app.config['MAIL_USERNAME'] = 'lifechoiceslotto147@gmail.com'
@@ -133,8 +135,10 @@ jwt = JWT(app, authenticate, identity)
 
 # using this check if the token is working
 @app.route('/protected')
+# a token is required which protects the user information
 @jwt_required()
 def protected():
+    # returns the user identity
     return '%s' % current_identity
 
 
@@ -144,6 +148,7 @@ def user_registration():
     response = {}
 
     try:
+        # using a POST method to create a new user
         if request.method == "POST":
             first_name = request.form['first_name']
             last_name = request.form['last_name']
@@ -151,7 +156,7 @@ def user_registration():
             email = request.form['email']
             username = request.form['username']
             password = request.form['password']
-
+            # connecting to the database
             with sqlite3.connect('shoppers.db') as conn:
                 cursor = conn.cursor()
                 cursor.execute("INSERT INTO user("
@@ -163,19 +168,17 @@ def user_registration():
                                "password) VALUES(?, ?, ?, ?, ?, ?)",
                                (first_name, last_name, address, email, username, password))
                 conn.commit()
-
+                # this response sent to the frontend
                 response["message"] = "success"
                 response["status_code"] = 201
+                # email will be sent to users email
                 msg = Message("Welcome new user!!!", sender="lifechoiceslotto147@gmail.com", recipients=[email])
                 msg.body = "You have successfully registered an account"
                 mail.send(msg)
             return response
+    # error handling for the email
     except SMTPRecipientsRefused:
         response["message"] = "Invalid email used"
-        response["status_code"] = 400
-        return response
-    except SMTPAuthenticationError:
-        response["message"] = "Invalid! Use proper username and password"
         response["status_code"] = 400
         return response
 
@@ -185,14 +188,17 @@ def user_registration():
 def view_profile(user_id):
     response = {}
 
+    # connecting to the database
     with sqlite3.connect("shoppers.db") as conn:
         cursor = conn.cursor()
+        # Select statement to view all the details about a certain user
         cursor.execute("SELECT * FROM user WHERE user_id=" + str(user_id))
 
+        # message to the front end
         response["status_code"] = 200
         response["description"] = "Profile retrieved successfully"
         response["data"] = cursor.fetchone()
-
+    # putting the in a JSON format
     return jsonify(response)
 
 
@@ -203,7 +209,9 @@ def create_products():
     response = {}
 
     try:
+        # using post method to create products
         if request.method == "POST":
+            # the user fill in certain details about the product
             name = request.form['name']
             price = request.form['price']
             desc = request.form['description']
@@ -211,8 +219,10 @@ def create_products():
             quantity = request.form['quantity']
             total = int(price) * int(quantity)
 
+            # CONNECTING TO THE DATABASE
             with sqlite3.connect("shoppers.db") as conn:
                 cursor = conn.cursor()
+                # using the insert statement to create a product
                 cursor.execute("INSERT INTO product("
                                "name,"
                                "price,"
@@ -222,11 +232,13 @@ def create_products():
                                "total) VALUES (?, ?, ?, ?, ?, ?)",
                                (name, price, desc, product_type, quantity, total))
                 conn.commit()
+                # sending a message to the front end developer
                 response["status_code"] = 201
                 response["description"] = "Product created successfully"
             return response
     except ConnectionError as e:
         return e
+    # using this generic statement to catch all the errors
     except Exception as e:
         return e
 
@@ -236,8 +248,10 @@ def create_products():
 def show_products():
     response = {}
 
+    # connecting to the database
     with sqlite3.connect("shoppers.db") as conn:
         cursor = conn.cursor()
+        # Using select statement to display the information
         cursor.execute("SELECT * FROM product")
 
         response["status_code"] = 200
@@ -250,10 +264,14 @@ def show_products():
 @app.route('/delete-products/<int:product_id>')
 def delete_products(product_id):
     response = {}
+
+    # connecting to the database
     with sqlite3.connect("shoppers.db") as conn:
         cursor = conn.cursor()
+        # using the delete statement to delete the product
         cursor.execute("DELETE FROM product WHERE id=" + str(product_id))
         conn.commit()
+        # a message that gets sent to the front end
         response['status_code'] = 200
         response['message'] = "Product successfully deleted"
 
@@ -264,17 +282,22 @@ def delete_products(product_id):
 @app.route('/edit-products/<int:product_id>', methods=["PUT"])
 def edit_products(product_id):
     response = {}
+    # using the PUT method to update certain details of a certain product
     if request.method == "PUT":
+        # connecting to a database
         with sqlite3.connect("shoppers.db") as conn:
+            # making the data a dictionary
             incoming_data = dict(request.json)
 
             put_data = {}
+            # changing the specific details
             if incoming_data.get("price") is not None:
                 put_data["price"] = incoming_data.get("price")
                 with sqlite3.connect("shoppers.db") as conn:
                     cursor = conn.cursor()
                     cursor.execute("UPDATE product SET price=? WHERE id=?", (put_data["price"], product_id))
                     conn.commit()
+                    # a message that gets sent to the front end
                     response['message'] = "Update was successful"
                     response['status_code'] = 200
                 return response
@@ -288,6 +311,7 @@ def edit_products(product_id):
                     response['status_code'] = 200
 
                 return response
+            # trying to update the total price
             new_price = int(incoming_data.get("price"))
             new_quantity = int(incoming_data.get("quantity"))
             new_total = new_price * new_quantity
@@ -301,6 +325,7 @@ def edit_products(product_id):
                 return response
 
 
+# a route that sends an email to the user
 @app.route('/send-email/<int:user_id>', methods=['GET', 'POST'])
 def send_email(user_id):
     response = {}
