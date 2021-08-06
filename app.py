@@ -193,28 +193,33 @@ def view_profile(user_id):
 def create_products():
     response = {}
 
-    if request.method == "POST":
-        name = request.form['name']
-        price = request.form['price']
-        desc = request.form['description']
-        product_type = request.form['type']
-        quantity = request.form['quantity']
-        total = int(price) * int(quantity)
+    try:
+        if request.method == "POST":
+            name = request.form['name']
+            price = request.form['price']
+            desc = request.form['description']
+            product_type = request.form['type']
+            quantity = request.form['quantity']
+            total = int(price) * int(quantity)
 
-        with sqlite3.connect("shoppers.db") as conn:
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO product("
-                           "name,"
-                           "price,"
-                           "description,"
-                           "type,"
-                           "quantity,"
-                           "total) VALUES (?, ?, ?, ?, ?, ?)",
-                           (name, price, desc, product_type, quantity, total))
-            conn.commit()
-            response["status_code"] = 201
-            response["description"] = "Product created successfully"
-        return response
+            with sqlite3.connect("shoppers.db") as conn:
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO product("
+                               "name,"
+                               "price,"
+                               "description,"
+                               "type,"
+                               "quantity,"
+                               "total) VALUES (?, ?, ?, ?, ?, ?)",
+                               (name, price, desc, product_type, quantity, total))
+                conn.commit()
+                response["status_code"] = 201
+                response["description"] = "Product created successfully"
+            return response
+    except ConnectionError as e:
+        return e
+    except Exception as e:
+        return e
 
 
 # a route to show all the products
@@ -290,7 +295,7 @@ def edit_products(product_id):
 @app.route('/send-email/<int:user_id>', methods=['GET', 'POST'])
 def send_email(user_id):
     response = {}
-    products = 'My name is Thabo. I like to steal'
+    products = 'You have successfully registered an account'
 
     if request.method == "POST":
         with sqlite3.connect("shoppers.db") as conn:
@@ -308,9 +313,9 @@ def send_email(user_id):
     return response
 
 
-@app.errorhandler(ConnectionError)
+@app.errorhandler(Exception)
 def connection(e):
-    return "Error message", str(e)
+    return "Error message: ", str(e)
 
 
 # This statement helps run the flask app instead of using the terminal
