@@ -173,7 +173,7 @@ def user_registration():
                 response["status_code"] = 201
                 # email will be sent to users email
                 msg = Message("Welcome new user!!!", sender="lifechoiceslotto147@gmail.com", recipients=[email])
-                msg.body = "You have successfully registered an account"
+                msg.body = "You have successfully registered an account. Welcome " + first_name
                 mail.send(msg)
             return response
     # error handling for the email
@@ -311,7 +311,7 @@ def edit_products(product_id):
                     response['status_code'] = 200
 
                 return response
-            # trying to update the total price
+            # trying to update the new total price
             new_price = int(incoming_data.get("price"))
             new_quantity = int(incoming_data.get("quantity"))
             new_total = new_price * new_quantity
