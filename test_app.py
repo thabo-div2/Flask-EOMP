@@ -1,24 +1,38 @@
 # class 2 Thabo Setsubi
 # Testing the app.py file
+import json
 import unittest
-import app
+from app import app
+import db
 import os
 
 
-TEST_DB = "test.db"
-
-
 # Testing Database class
-class TestDatabase(unittest.TestCase):
-    def setUp(self, db=None):
-        app.config['TESTING'] = True
-        app.config['WTF_CSRF_ENABLED'] = False
-        app.config['DEBUG'] = False
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + \
-                                                os.path.join(app.config['BASEDIR'], TEST_DB)
+class ApiTest(unittest.TestCase):
+
+    def setUp(self):
         self.app = app.test_client()
-        db.drop_all()
-        db.create_all()
+
+    def test_user(self):
+        payload = json.dumps({
+            "username": "thabo",
+            "password": "abcxyz"
+        })
+
+        response = self.app.post('/auth')
+
+        self.assertEqual(str, type(response.json['id']))
+        self.assertEqual(200, response.status_code)
+        print(response)
+
+    def test_product(self):
+        response = self.app.get("/view-profile/3")
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(str, response.json['id'])
+        print(response)
+
+    def test_sending_email(self):
+        pass
 
 
 if __name__ == "__main__":
