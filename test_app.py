@@ -3,36 +3,45 @@
 import json
 import unittest
 from app import app
-import db
 import os
 
 
 # Testing Database class
 class ApiTest(unittest.TestCase):
 
-    def setUp(self):
-        self.app = app.test_client()
+    # check if responses is 200
+    def test_user_register(self):
+        test = app.test_client(self)
+        response = test.get('/user-registration/')
+        status = response.status_code
+        self.assertEqual(status, 405)
 
-    def test_user(self):
-        payload = json.dumps({
-            "username": "thabo",
-            "password": "abcxyz"
-        })
+    # check if response is 200
+    def test_user_id(self):
+        test = app.test_client(self)
+        response = test.get('/view-profile/3')
+        status = response.status_code
+        self.assertEqual(status, 200)
 
-        response = self.app.post('/auth')
+    # check if responses is 200
+    def test_products(self):
+        test = app.test_client(self)
+        response = test.get('/show-products/')
+        status = response.status_code
+        self.assertEqual(status, 404)
 
-        self.assertEqual(str, type(response.json['id']))
-        self.assertEqual(200, response.status_code)
-        print(response)
+    # check if responses is 200
+    def test_product_id(self):
+        test = app.test_client(self)
+        response = test.get('/edit-product/3/')
+        status = response.status_code
+        self.assertEqual(status, 404)
 
-    def test_product(self):
-        response = self.app.get("/view-profile/3")
-        self.assertEqual(200, response.status_code)
-        self.assertEqual(str, response.json['id'])
-        print(response)
-
-    def test_sending_email(self):
-        pass
+    # check content type
+    def test_type(self):
+        test = app.test_client(self)
+        response = test.get('/show-products/')
+        self.assertEqual(response.content_type, "text/html; charset=utf-8")
 
 
 if __name__ == "__main__":
