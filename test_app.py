@@ -1,12 +1,10 @@
 # class 2 Thabo Setsubi
 # Testing the app.py file
-import json
 import unittest
 from app import app
-import os
 
 
-# Testing Database class
+# Testing Api
 class ApiTest(unittest.TestCase):
 
     # check if responses is 200
@@ -42,6 +40,13 @@ class ApiTest(unittest.TestCase):
         test = app.test_client(self)
         response = test.get('/show-products/')
         self.assertEqual(response.content_type, "text/html; charset=utf-8")
+
+    # check the email
+    def test_sending_email(self):
+        test = app.test_client(self)
+        response = test.get('/send-email')
+        status = response.status_code
+        self.assertEqual(status, 404)
 
 
 if __name__ == "__main__":
