@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify
 from flask_jwt import JWT, jwt_required, current_identity
 from flask_cors import CORS
 from flask_mail import Mail, Message
+from smtplib import SMTPRecipientsRefused, SMTPAuthenticationError
 import hmac
 import sqlite3
 
@@ -142,32 +143,40 @@ def protected():
 def user_registration():
     response = {}
 
-    if request.method == "POST":
+    try:
+        if request.method == "POST":
+            first_name = request.form['first_name']
+            last_name = request.form['last_name']
+            address = request.form['address']
+            email = request.form['email']
+            username = request.form['username']
+            password = request.form['password']
 
-        first_name = request.form['first_name']
-        last_name = request.form['last_name']
-        address = request.form['address']
-        email = request.form['email']
-        username = request.form['username']
-        password = request.form['password']
+            with sqlite3.connect('shoppers.db') as conn:
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO user("
+                               "first_name,"
+                               "last_name,"
+                               "address,"
+                               "email,"
+                               "username,"
+                               "password) VALUES(?, ?, ?, ?, ?, ?)",
+                               (first_name, last_name, address, email, username, password))
+                conn.commit()
 
-        with sqlite3.connect('shoppers.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO user("
-                           "first_name,"
-                           "last_name,"
-                           "address,"
-                           "email,"
-                           "username,"
-                           "password) VALUES(?, ?, ?, ?, ?, ?)",
-                           (first_name, last_name, address, email, username, password))
-            conn.commit()
-
-            response["message"] = "success"
-            response["status_code"] = 201
-            msg = Message("Welcome new user!!!", sender="lifechoiceslotto147@gmail.com", recipients=[email])
-            msg.body = "You have successfully registered an account"
-            mail.send(msg)
+                response["message"] = "success"
+                response["status_code"] = 201
+                msg = Message("Welcome new user!!!", sender="lifechoiceslotto147@gmail.com", recipients=[email])
+                msg.body = "You have successfully registered an account"
+                mail.send(msg)
+            return response
+    except SMTPRecipientsRefused:
+        response["message"] = "Invalid email used"
+        response["status_code"] = 400
+        return response
+    except SMTPAuthenticationError:
+        response["message"] = "Invalid! Use proper username and password"
+        response["status_code"] = 400
         return response
 
 
@@ -297,25 +306,25 @@ def send_email(user_id):
     response = {}
     products = 'You have successfully registered an account'
 
-    if request.method == "POST":
-        with sqlite3.connect("shoppers.db") as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM user WHERE user_id=?", str(user_id))
-            receiver = cursor.fetchall()
-            print(receiver)
-            for data in receiver:
-                print(data)
-                msg = Message("Product received", sender="lifechoiceslotto147@gmail.com", recipients=[data[4]])
-                msg.body = products
-                mail.send(msg)
-        response['status_code'] = 200
-        response['message'] = "Email was sent successful"
-    return response
-
-
-@app.errorhandler(Exception)
-def connection(e):
-    return "Error message: ", str(e)
+    try:
+        if request.method == "POST":
+            with sqlite3.connect("shoppers.db") as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM user WHERE user_id=?", str(user_id))
+                receiver = cursor.fetchall()
+                print(receiver)
+                for data in receiver:
+                    print(data)
+                    msg = Message("Product received", sender="lifechoiceslotto147@gmail.com", recipients=[data[4]])
+                    msg.body = products
+                    mail.send(msg)
+            response['status_code'] = 200
+            response['message'] = "Email was sent successful"
+        return response
+    except SMTPRecipientsRefused:
+        response["message"] = "Invalid email used"
+        response["status_code"] = 400
+        return response
 
 
 # This statement helps run the flask app instead of using the terminal
