@@ -1,7 +1,7 @@
 # Class 2 Thabo Setsubi
 # Flask End of Module Project
 # Point of Sale API
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, redirect
 from flask_jwt import JWT, jwt_required, current_identity
 from flask_cors import CORS
 from flask_mail import Mail, Message
@@ -171,11 +171,7 @@ def user_registration():
                 # this response sent to the frontend
                 response["message"] = "success"
                 response["status_code"] = 201
-                # email will be sent to users email
-                msg = Message("Welcome new user!!!", sender="lifechoiceslotto147@gmail.com", recipients=[email])
-                msg.body = "You have successfully registered an account. Welcome " + first_name
-                mail.send(msg)
-            return response
+                return redirect('/send-email/%s', email)
     # error handling for the email
     except SMTPRecipientsRefused:
         response["message"] = "Invalid email used"
@@ -326,8 +322,8 @@ def edit_products(product_id):
 
 
 # a route that sends an email to the user
-@app.route('/send-email/<int:user_id>', methods=['GET', 'POST'])
-def send_email(user_id):
+@app.route('/send-email/<email>', methods=['GET', 'POST'])
+def send_email(email):
     response = {}
     products = 'You have successfully registered an account'
 
@@ -335,7 +331,7 @@ def send_email(user_id):
         if request.method == "POST":
             with sqlite3.connect("shoppers.db") as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT * FROM user WHERE user_id=?", str(user_id))
+                cursor.execute("SELECT * FROM user WHERE email=?", str(email))
                 receiver = cursor.fetchall()
                 print(receiver)
                 for data in receiver:
