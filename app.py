@@ -208,11 +208,11 @@ def create_products():
         # using post method to create products
         if request.method == "POST":
             # the user fill in certain details about the product
-            name = request.form['name']
-            price = request.form['price']
-            desc = request.form['description']
-            product_type = request.form['type']
-            quantity = request.form['quantity']
+            name = request.json['name']
+            price = request.json['price']
+            desc = request.json['description']
+            product_type = request.json['type']
+            quantity = request.json['quantity']
             total = int(price) * int(quantity)
 
             # CONNECTING TO THE DATABASE
