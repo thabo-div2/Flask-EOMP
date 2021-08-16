@@ -312,7 +312,7 @@ def create_products():
                                "total) VALUES (?, ?, ?, ?, ?, ?)",
                                (name, price, desc, product_type, quantity, total))
                 conn.commit()
-                data = jsonify(name, price, desc, product_type,quantity, total)
+                data = (name, price, desc, product_type,quantity, total)
                 # sending a message to the front end developer
                 response["status_code"] = 201
                 response['data'] = data
