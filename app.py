@@ -200,7 +200,6 @@ def view_profile(user_id):
 
 # a route to add new products
 @app.route('/create-products', methods=["POST"])
-@jwt_required()
 def create_products():
     response = {}
 
