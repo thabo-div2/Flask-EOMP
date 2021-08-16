@@ -26,39 +26,54 @@ class Products(object):
         self.type = product_type
 
 
-class Database:
-    def __init__(self):
-        self.conn = sqlite3.connect("shoppers.db")
-        self.cursor = self.conn.cursor()
+class Admin(object):
+    def __init__(self, id, username, password):
+        self.id = id
+        self.username = username
+        self.password = password
 
-    # function that initialises the user table
-    def init_users_table(self):
-        conn = sqlite3.connect('shoppers.db')
-        print("Opened database successfully")
 
-        conn.execute("CREATE TABLE IF NOT EXISTS user(user_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+# function that initialises the user table
+def init_users_table():
+    conn = sqlite3.connect('shoppers.db')
+    print("Opened database successfully")
+
+    conn.execute("CREATE TABLE IF NOT EXISTS user(user_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                 "first_name TEXT NOT NULL,"
+                 "last_name TEXT NOT NULL,"
+                 "address TEXT NOT NULL,"
+                 "email TEXT NOT NULL,"
+                 "username TEXT NOT NULL,"
+                 "password TEXT NOT NULL)")
+    print("user table created successfully")
+    conn.close()
+    return init_users_table
+
+
+# Initialising the products table
+def init_products_table():
+    with sqlite3.connect("shoppers.db") as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS product (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                     "name TEXT NOT NULL,"
+                     "price INTEGER NOT NULL,"
+                     "description TEXT NOT NULL,"
+                     "type TEXT NOT NULL,"
+                     "quantity INTEGER NOT NULL,"
+                     "total INTEGER NOT NULL)")
+        print("products table created successfully")
+    return init_products_table
+
+
+def init_admin_table():
+    with sqlite3.connect("shoppers.db") as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS admin (admin_id INTEGER PRIMARY KEY AUTOINCREMENT,"
                      "first_name TEXT NOT NULL,"
                      "last_name TEXT NOT NULL,"
-                     "address TEXT NOT NULL,"
                      "email TEXT NOT NULL,"
                      "username TEXT NOT NULL,"
                      "password TEXT NOT NULL)")
-        print("user table created successfully")
-        conn.close()
-        return self.init_users_table
-
-    # Initialising the products table
-    def init_products_table(self):
-        with sqlite3.connect("shoppers.db") as conn:
-            conn.execute("CREATE TABLE IF NOT EXISTS product (id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                         "name TEXT NOT NULL,"
-                         "price INTEGER NOT NULL,"
-                         "description TEXT NOT NULL,"
-                         "type TEXT NOT NULL,"
-                         "quantity INTEGER NOT NULL,"
-                         "total INTEGER NOT NULL)")
-            print("products table created successfully")
-        return self.init_products_table
+        print("admin table created successfully")
+    return init_admin_table
 
 
 # function that fetches the users and puts it into a list
@@ -90,16 +105,37 @@ def fetch_products():
         return new_item
 
 
+def fetch_admin():
+    with sqlite3.connect('shoppers.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM admin")
+        users_data = cursor.fetchall()
+
+        new_data = []
+
+        for data in users_data:
+            print(data)
+            new_data.append(Admin(data[0], data[4], data[5]))
+
+        return new_data
+
+
 # calling the functions
-Database()
+init_admin_table()
+init_users_table()
+init_products_table()
 users = fetch_users()
 products = fetch_products()
+admin = fetch_admin()
 
 username_table = {u.username: u for u in users}
 userid_table = {u.id: u for u in users}
 
 product_table = {p.name: p for p in products}
 productid_table = {p.id: p for p in products}
+
+admin_table = {a.username: a for a in admin}
+adminid_table = {a.id: a for a in admin}
 
 
 # to help protect our password
@@ -179,6 +215,55 @@ def user_registration():
         return response
 
 
+@app.route("/admin-registration", methods=["POST"])
+def admin_registration():
+    response = {}
+    if request.method == "POST":
+        first_name = request.form['first_name']
+        last_name = request.form['last_name']
+        email = request.form['email']
+        username = request.form['username']
+        password = request.form['password']
+        # connecting to the database
+        with sqlite3.connect('shoppers.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO admin("
+                           "first_name,"
+                           "last_name,"
+                           "email,"
+                           "username,"
+                           "password) VALUES(?, ?, ?, ?, ?)",
+                           (first_name, last_name, email, username, password))
+            conn.commit()
+            # this response sent to the frontend
+            response["message"] = "success"
+            response["status_code"] = 201
+        return response
+
+
+@app.route("/admin-login", methods=["POST"])
+def admin_login():
+    response = {}
+    if request.method == "POST":
+        username = request.json["username"]
+        password = request.json["password"]
+        conn = sqlite3.connect("shoppers.db")
+        c = conn.cursor()
+        statement = (f"SELECT * FROM admin WHERE username='{username}' and password ="
+                     f"'{password}'")
+        c.execute(statement)
+        if not c.fetchone():
+            response['message'] = "failed"
+            response["status_code"] = 401
+            return response
+        else:
+            response['message'] = "welcome admin user"
+            response["status_code"] = 201
+            return response
+    else:
+        return "wrong method"
+
+
 # a route to view a single users profile
 @app.route('/view-profile/<int:user_id>')
 def view_profile(user_id):
@@ -253,6 +338,21 @@ def show_products():
 
         response["status_code"] = 200
         response["description"] = "Displaying all products successfully"
+        response["data"] = cursor.fetchall()
+    return jsonify(response)
+
+
+@app.route('/show-users')
+def show_users():
+    response = {}
+
+    with sqlite3.connect("shoppers.db") as conn:
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT * FROM user")
+
+        response["status_code"] = 200
+        response["description"] = "Displaying all users successfully"
         response["data"] = cursor.fetchall()
     return jsonify(response)
 
