@@ -408,18 +408,7 @@ def edit_products(product_id):
                     response['status_code'] = 200
 
                 return response
-            # trying to update the new total price
-            new_price = int(incoming_data.get("price"))
-            new_quantity = int(incoming_data.get("quantity"))
-            new_total = new_price * new_quantity
-            if incoming_data.get("total") is not None:
-                put_data["total"] = incoming_data.get("total")
-                with sqlite3.connect("shoppers.db") as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("UPDATE product SET total WHERE id=?", (new_total, product_id))
-                    response['status_code'] = 200
-                    response['message'] = "Update was successful"
-                return response
+
 
 
 # a route that sends an email to the user
