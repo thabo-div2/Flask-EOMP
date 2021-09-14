@@ -4,31 +4,9 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_mail import Mail, Message
-from smtplib import SMTPRecipientsRefused, SMTPAuthenticationError
+from smtplib import SMTPRecipientsRefused
 import sqlite3
-
-
-class User(object):
-    def __init__(self, id, username, password):
-        self.id = id
-        self.username = username
-        self.password = password
-
-
-class Products(object):
-    def __init__(self, product_id, name, price, desc, product_type):
-        self.id = product_id
-        self.name = name
-        self.price = price
-        self.desc = desc
-        self.type = product_type
-
-
-class Admin(object):
-    def __init__(self, id, username, password):
-        self.id = id
-        self.username = username
-        self.password = password
+import re
 
 
 class Database:
@@ -77,46 +55,33 @@ class Database:
             print("admin table created successfully")
         return self.init_admin_table
 
-    # function that fetches the users and puts it into a list
-    def fetch_users(self):
-        with sqlite3.connect('shoppers.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM user")
-            shoppers = cursor.fetchall()
 
-            new_data = []
+class QueryDatabase:
+    def __init__(self):
+        self.conn = sqlite3.connect("shoppers.db")
+        self.cursor = self.conn.cursor()
 
-            for data in shoppers:
-                print(data)
-                new_data.append(User(data[0], data[5], data[6]))
-        return new_data
+    def select_one(self, query, value):
+        product_id = value
+        self.cursor.execute(query, product_id)
+        return self.cursor.fetchone()
 
-    def fetch_products(self):
-        with sqlite3.connect("shoppers.db") as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM product")
-            items = cursor.fetchall()
+    def select_all(self, query):
+        self.cursor.execute(query)
+        data = self.cursor.fetchall()
+        return data
 
-            new_item = []
+    def insert(self, query, values):
+        self.cursor.execute(query, values)
+        self.conn.commit()
 
-            for data in items:
-                print(data)
-                new_item.append(Products(data[0], data[1], data[2], data[3], data[4]))
-            return new_item
+    def delete_item(self, ident, query):
+        self.cursor.execute(query, ident)
+        self.conn.commit()
 
-    def fetch_admin(self):
-        with sqlite3.connect('shoppers.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM admin")
-            users_data = cursor.fetchall()
-
-            new_data = []
-
-            for data in users_data:
-                print(data)
-                new_data.append(Admin(data[0], data[4], data[5]))
-
-            return new_data
+    def edit_item(self, ident, query):
+        self.cursor.execute(query, ident)
+        self.conn.commit()
 
 
 def dict_factory(cursor, row):
@@ -146,6 +111,7 @@ mail = Mail(app)
 @app.route('/user-registration/', methods=["POST"])
 def user_registration():
     response = {}
+    db = QueryDatabase()
 
     try:
         # using a POST method to create a new user
@@ -157,21 +123,14 @@ def user_registration():
             username = request.form['username']
             password = request.form['password']
             # connecting to the database
-            with sqlite3.connect('shoppers.db') as conn:
-                cursor = conn.cursor()
-                cursor.execute("INSERT INTO user("
-                               "first_name,"
-                               "last_name,"
-                               "address,"
-                               "email,"
-                               "username,"
-                               "password) VALUES(?, ?, ?, ?, ?, ?)",
-                               (first_name, last_name, address, email, username, password))
-                conn.commit()
-                # this response sent to the frontend
-                response["message"] = "success"
-                response["status_code"] = 201
-                return response
+            query = ("INSERT INTO user(first_name, last_name, address, email, username, password) "
+                     "VALUES(?, ?, ?, ?, ?, ?)")
+            values = first_name, last_name, address, email, username, password
+            db.insert(query, values)
+            # this response sent to the frontend
+            response["message"] = "success"
+            response["status_code"] = 201
+            return response
     # error handling for the email
     except SMTPRecipientsRefused:
         response["message"] = "Invalid email used"
@@ -231,24 +190,25 @@ def admin_registration():
 def admin_login():
     response = {}
     if request.method == "PATCH":
-        username = request.json["username"]
-        password = request.json["password"]
-        conn = sqlite3.connect("shoppers.db")
-        conn.row_factory = dict_factory
-        c = conn.cursor()
-        statement = (f"SELECT * FROM admin WHERE username='{username}' and password ="
-                     f"'{password}'")
-        c.execute(statement)
-        if not c.fetchone():
-            response['message'] = "failed"
-            response["status_code"] = 400
-            return response
-        else:
-            admin = c.fetchone()
-            response['data'] = admin
-            response['message'] = "welcome admin user"
-            response["status_code"] = 200
-            return response
+        with sqlite3.connect("shoppers.db") as conn:
+            username = request.json["username"]
+            password = request.json["password"]
+            conn = sqlite3.connect("shoppers.db")
+            conn.row_factory = dict_factory
+            c = conn.cursor()
+            statement = (f"SELECT * FROM admin WHERE username='{username}' and password ="
+                         f"'{password}'")
+            c.execute(statement)
+            if not c.fetchone():
+                response['message'] = "failed"
+                response["status_code"] = 400
+                return response
+            else:
+                admin = c.fetchone()
+                response['data'] = admin
+                response['message'] = "welcome admin user"
+                response["status_code"] = 200
+                return response
     else:
         return "wrong method"
 
@@ -302,7 +262,14 @@ def create_products():
                                "total) VALUES (?, ?, ?, ?, ?, ?)",
                                (name, price, desc, product_type, quantity, total))
                 conn.commit()
-                data = (name, price, desc, product_type,quantity, total)
+                data = {
+                    "name": name,
+                    "price": price,
+                    "description": desc,
+                    "type": product_type,
+                    "quantity": quantity,
+                    "total": total
+                }
                 # sending a message to the front end developer
                 response["status_code"] = 201
                 response['data'] = data
@@ -322,6 +289,7 @@ def show_products():
 
     # connecting to the database
     with sqlite3.connect("shoppers.db") as conn:
+        conn.row_factory = dict_factory
         cursor = conn.cursor()
         # Using select statement to display the information
         cursor.execute("SELECT * FROM product")
@@ -337,6 +305,7 @@ def show_users():
     response = {}
 
     with sqlite3.connect("shoppers.db") as conn:
+        conn.row_factory = dict_factory
         cursor = conn.cursor()
 
         cursor.execute("SELECT * FROM user")
@@ -400,7 +369,6 @@ def edit_products(product_id):
                 return response
 
 
-
 # a route that sends an email to the user
 @app.route('/send-email/<email>', methods=['GET', 'POST'])
 def send_email(email):
@@ -431,4 +399,3 @@ def send_email(email):
 # This statement helps run the flask app instead of using the terminal
 if __name__ == '__main__':
     app.run()
-
